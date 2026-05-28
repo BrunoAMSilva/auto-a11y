@@ -1,0 +1,15 @@
+#!/usr/bin/env node
+import { existsSync, mkdirSync } from 'node:fs';
+import { resolve } from 'node:path';
+
+// Must be set before importing dist/cli.js (which transitively loads playwright).
+const local = resolve(process.cwd(), '.ms-playwright');
+if (!existsSync(local)) mkdirSync(local, { recursive: true });
+if (!process.env.PLAYWRIGHT_BROWSERS_PATH) {
+  process.env.PLAYWRIGHT_BROWSERS_PATH = local;
+}
+
+import('../dist/cli.js').catch((err) => {
+  console.error(err);
+  process.exit(1);
+});

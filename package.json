@@ -1,0 +1,39 @@
+{
+  "name": "auto-a11y",
+  "version": "0.1.0",
+  "description": "Automated accessibility audits driven by Playwright + axe-core with custom checks, accname-1.2 utilities, and hermetic offline support.",
+  "type": "module",
+  "bin": {
+    "auto-a11y": "bin/auto-a11y"
+  },
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "start": "node dist/cli.js scan --crawl https://natixisinportugal.com --output ./a11y-report",
+    "build": "tsc -p tsconfig.json && node -e \"const f=require('node:fs');f.mkdirSync('dist/data',{recursive:true});f.copyFileSync('src/data/wcag-index.json','dist/data/wcag-index.json');\"",
+    "dev": "tsx src/cli.ts",
+    "install-browsers": "PLAYWRIGHT_BROWSERS_PATH=$PWD/.ms-playwright tsx src/scripts/install-browsers.ts",
+    "bundle": "tsx src/scripts/bundle-offline.ts",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "files": [
+    "dist",
+    "bin",
+    "src/data"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "@axe-core/playwright": "^4.10.0",
+    "commander": "^12.1.0",
+    "playwright": "^1.49.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2",
+    "vitest": "^2.1.8"
+  }
+}
