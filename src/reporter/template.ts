@@ -19,22 +19,22 @@ export function renderReport(data: ReportData): string {
 </head>
 <body>
 <header class="topbar">
-  <div class="brand">auto-a11y</div>
-  <div class="meta">Generated ${escapeHtml(new Date(data.generatedAt).toLocaleString())} · ${data.totals.pages} page(s) · ${data.totals.violationNodes} failing instance(s)</div>
-  <button class="theme-toggle" id="themeToggle" aria-label="Toggle dark / light theme">Light</button>
+  <h1 class="brand">auto-a11y</h1>
+  <p class="meta">Generated ${escapeHtml(new Date(data.generatedAt).toLocaleString())} · ${data.totals.pages} page(s) · ${data.totals.violationNodes} failing instance(s)</p>
+  <button type="button" class="theme-toggle" id="themeToggle">Switch to light theme</button>
 </header>
 
-<section class="summary">
+<section class="summary" aria-label="Failing instances by impact">
   ${renderImpactPill('critical', data.totals.impacts.critical)}
   ${renderImpactPill('serious', data.totals.impacts.serious)}
   ${renderImpactPill('moderate', data.totals.impacts.moderate)}
   ${renderImpactPill('minor', data.totals.impacts.minor)}
 </section>
 
-<nav class="tabs" role="tablist">
-  <button class="tab active" role="tab" aria-selected="true" data-view="by-page">By page</button>
-  <button class="tab" role="tab" aria-selected="false" data-view="by-issue">By issue type</button>
-</nav>
+<div class="tabs" role="tablist" aria-label="Report views">
+  <button type="button" class="tab active" role="tab" id="tab-by-page" aria-selected="true" aria-controls="by-page" data-view="by-page">By page</button>
+  <button type="button" class="tab" role="tab" id="tab-by-issue" aria-selected="false" aria-controls="by-issue" data-view="by-issue" tabindex="-1">By issue type</button>
+</div>
 
 <section class="filters" aria-label="Filters">
   <label><span>Impact:</span>
@@ -51,10 +51,10 @@ export function renderReport(data: ReportData): string {
 </section>
 
 <main>
-  <section id="by-page" class="view active">
+  <section id="by-page" class="view active" role="tabpanel" aria-labelledby="tab-by-page" tabindex="0">
     ${data.byPage.map(renderPage).join('\n')}
   </section>
-  <section id="by-issue" class="view">
+  <section id="by-issue" class="view" role="tabpanel" aria-labelledby="tab-by-issue" tabindex="0">
     ${data.byIssue.map(renderIssue).join('\n')}
   </section>
 </main>
@@ -78,11 +78,12 @@ function renderPage(group: PageGroup): string {
   const openAttr = hasFindings ? ' open' : '';
   return `<details class="page-group${hasFindings ? '' : ' clean'}" data-impacts="${impactsAttr(group.impacts)}" data-clean="${hasFindings ? 'false' : 'true'}"${openAttr}>
   <summary>
-    <h2><a href="${escapeHtml(group.url)}" target="_blank" rel="noopener">${escapeHtml(group.pageTitle || group.url)}</a></h2>
+    <h2 class="page-title">${escapeHtml(group.pageTitle || group.url)}</h2>
     <div class="page-meta"><code>${escapeHtml(group.url)}</code></div>
     <div class="page-summary">${summary}</div>
   </summary>
   <div class="page-body" id="${id}">
+    <p class="page-link"><a href="${escapeHtml(group.url)}" target="_blank" rel="noopener">Open page in new tab ↗</a></p>
     ${group.findings.map(renderFindingBlock).join('\n')}
   </div>
 </details>`;
@@ -131,7 +132,7 @@ function renderNode(n: { target: string; html: string; failureSummary?: string; 
   </div>
   ${n.failureSummary ? `<p class="failure">${escapeHtml(n.failureSummary)}</p>` : ''}
   <pre class="snippet"><code>${escapeHtml(n.html.slice(0, 1500))}${n.html.length > 1500 ? '…' : ''}</code></pre>
-  ${n.screenshotPath ? `<a href="${escapeHtml(n.screenshotPath)}" target="_blank"><img class="shot" src="${escapeHtml(n.screenshotPath)}" alt="screenshot" loading="lazy" /></a>` : ''}
+  ${n.screenshotPath ? `<a href="${escapeHtml(n.screenshotPath)}" target="_blank" rel="noopener"><img class="shot" src="${escapeHtml(n.screenshotPath)}" alt="Screenshot of the failing element ${escapeHtml(n.target)}" loading="lazy" /></a>` : ''}
 </li>`;
 }
 
@@ -219,9 +220,14 @@ html[data-theme="light"] {
 }
 * { box-sizing: border-box; }
 body { font: 14px/1.5 -apple-system, "SF Pro Text", "Segoe UI", Roboto, sans-serif; margin: 0; background: var(--bg); color: var(--fg); }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 2px; }
+summary:focus-visible, .tab:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { transition: none !important; scroll-behavior: auto !important; }
+}
 .topbar { display: flex; align-items: center; gap: 16px; padding: 14px 24px; background: var(--bg-elev); border-bottom: 1px solid var(--border); }
-.brand { font-weight: 700; letter-spacing: 0.5px; color: var(--accent); }
-.meta { color: var(--muted); font-size: 13px; flex: 1; }
+.brand { margin: 0; font-size: 15px; font-weight: 700; letter-spacing: 0.5px; color: var(--accent); }
+.meta { margin: 0; color: var(--muted); font-size: 13px; flex: 1; }
 .theme-toggle { background: var(--bg-elev2); color: var(--fg); border: 1px solid var(--border); border-radius: 6px; padding: 6px 12px; cursor: pointer; font: inherit; font-size: 12px; }
 .theme-toggle:hover { border-color: var(--accent); }
 .summary { display: flex; gap: 12px; padding: 16px 24px; background: var(--bg-elev); border-bottom: 1px solid var(--border); flex-wrap: wrap; }
@@ -248,9 +254,9 @@ main { padding: 24px; max-width: 1280px; margin: 0 auto; }
 .page-group summary::marker, .issue-group summary::marker { display: none; }
 .page-group summary::before, .issue-group summary::before { content: "▶"; color: var(--muted); font-size: 10px; transition: transform 0.15s; display: inline-block; }
 .page-group[open] summary::before, .issue-group[open] summary::before { transform: rotate(90deg); }
-.page-group summary h2, .issue-group summary h2 { font-size: 16px; margin: 0; }
-.page-group summary h2 a { color: var(--fg); text-decoration: none; }
-.page-group summary h2 a:hover { color: var(--accent); }
+.page-group summary h2, .issue-group summary h2 { font-size: 16px; margin: 0; color: var(--fg); }
+.page-link { margin: 0 0 12px; }
+.page-link a { color: var(--accent); font-size: 13px; }
 .page-group .page-meta { width: 100%; color: var(--muted); font-size: 12px; padding-left: 16px; }
 .page-group .page-meta code { background: transparent; padding: 0; }
 .page-group .page-summary { font-size: 12px; color: var(--muted); margin-left: auto; }
@@ -259,12 +265,14 @@ main { padding: 24px; max-width: 1280px; margin: 0 auto; }
 .violation { border-top: 1px solid var(--border); padding: 18px 0; }
 .violation:first-child { border-top: 0; }
 .violation-head { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+/* Badge backgrounds are fixed (theme-independent) and dark enough for white
+   text to clear WCAG 1.4.3 AA (>=4.5:1) in both themes. */
 .impact-badge { padding: 3px 10px; border-radius: 4px; font-size: 11px; font-weight: 700; color: #fff; text-transform: uppercase; letter-spacing: 0.5px; }
-.impact-badge.impact-critical { background: var(--crit); }
-.impact-badge.impact-serious { background: var(--serious); }
-.impact-badge.impact-moderate { background: var(--moderate); color: #0d1117; }
-.impact-badge.impact-minor { background: var(--minor); color: #0d1117; }
-.ok-badge { padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 700; background: var(--ok); color: #fff; text-transform: uppercase; letter-spacing: 0.5px; }
+.impact-badge.impact-critical { background: #b3261d; }
+.impact-badge.impact-serious { background: #b2540e; }
+.impact-badge.impact-moderate { background: #8c5a00; }
+.impact-badge.impact-minor { background: #475569; }
+.ok-badge { padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 700; background: #1a7f37; color: #fff; text-transform: uppercase; letter-spacing: 0.5px; }
 .rule-id { font-family: ui-monospace, SFMono-Regular, monospace; font-size: 13px; font-weight: 600; color: var(--fg); }
 .source-badge { font-size: 11px; padding: 2px 8px; background: var(--bg-elev2); border: 1px solid var(--border); border-radius: 4px; color: var(--muted); }
 .count { font-size: 12px; color: var(--muted); font-weight: 500; margin-left: auto; }
@@ -308,7 +316,7 @@ const SCRIPT = `
   const stored = localStorage.getItem('a11yTheme');
   if (stored) html.setAttribute('data-theme', stored);
   const themeBtn = document.getElementById('themeToggle');
-  const syncBtn = () => themeBtn.textContent = html.getAttribute('data-theme') === 'dark' ? 'Light' : 'Dark';
+  const syncBtn = () => themeBtn.textContent = html.getAttribute('data-theme') === 'dark' ? 'Switch to light theme' : 'Switch to dark theme';
   syncBtn();
   themeBtn.addEventListener('click', () => {
     const next = html.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
@@ -317,13 +325,28 @@ const SCRIPT = `
     syncBtn();
   });
 
-  const tabs = document.querySelectorAll('.tab');
+  const tabs = Array.from(document.querySelectorAll('.tab'));
   const views = document.querySelectorAll('.view');
-  tabs.forEach((tab) => {
-    tab.addEventListener('click', () => {
-      tabs.forEach((t) => { t.classList.toggle('active', t === tab); t.setAttribute('aria-selected', t === tab ? 'true' : 'false'); });
-      const target = tab.getAttribute('data-view');
-      views.forEach((v) => v.classList.toggle('active', v.id === target));
+  function activateTab(tab, setFocus) {
+    tabs.forEach((t) => {
+      const selected = t === tab;
+      t.classList.toggle('active', selected);
+      t.setAttribute('aria-selected', selected ? 'true' : 'false');
+      t.tabIndex = selected ? 0 : -1;
+    });
+    const target = tab.getAttribute('data-view');
+    views.forEach((v) => v.classList.toggle('active', v.id === target));
+    if (setFocus) tab.focus();
+  }
+  tabs.forEach((tab, i) => {
+    tab.addEventListener('click', () => activateTab(tab, false));
+    tab.addEventListener('keydown', (e) => {
+      let next = null;
+      if (e.key === 'ArrowRight' || e.key === 'ArrowDown') next = tabs[(i + 1) % tabs.length];
+      else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') next = tabs[(i - 1 + tabs.length) % tabs.length];
+      else if (e.key === 'Home') next = tabs[0];
+      else if (e.key === 'End') next = tabs[tabs.length - 1];
+      if (next) { e.preventDefault(); activateTab(next, true); }
     });
   });
 
