@@ -18,6 +18,7 @@ open a11y-report/report.html
 auto-a11y scan <url>                                    single URL
 auto-a11y scan --urls urls.txt                          newline-delimited file
 auto-a11y scan --crawl <url> --depth 2 --max-pages 50   crawl
+auto-a11y scan --recording flow.json                    replay a Chrome DevTools Recorder JSON
 auto-a11y scan --checks-dir ./checks                    add custom checks
 auto-a11y scan --output ./report                        output dir (default: ./a11y-report)
 auto-a11y scan --tags wcag2a,wcag2aa,wcag22aa           override axe tags
@@ -35,6 +36,18 @@ auto-a11y bundle --out ./offline.tgz                    offline tarball
 ```
 
 Exit codes: `0` clean · `1` violations found · `2` runtime error.
+
+## Chrome DevTools recordings
+
+Record a user journey in Chrome (DevTools → **Recorder** → export as JSON), then replay it under the full check suite:
+
+```bash
+auto-a11y scan --recording flow.json
+```
+
+The recording is replayed step-by-step in one browser session. Checks run after the initial navigation and after every step that navigates (deduplicated by URL), plus after any interaction that opens an overlay (a click/keypress with asserted events but no navigation — e.g. a modal or slide-over), which is reported as a distinct `<url> » <step>` state. A step whose element can't be found is logged and skipped so the rest of the journey still runs.
+
+Element matching prefers the first **visible** match among Chrome's selector alternatives (responsive sites often duplicate nav/buttons, leaving the first match hidden); `aria/` selectors resolve by accessible role + name, and `text/` selectors match as a substring.
 
 ## Custom checks
 

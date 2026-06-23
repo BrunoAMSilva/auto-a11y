@@ -18,6 +18,7 @@ program
   .description('Scan one or more URLs for accessibility issues.')
   .argument('[url]', 'URL to scan (omit when using --urls or --crawl)')
   .option('--urls <file>', 'newline-delimited file of URLs to scan')
+  .option('--recording <file>', 'replay a Chrome DevTools Recorder JSON file, scanning each page state')
   .option('--crawl <url>', 'seed URL to crawl from')
   .option('--depth <n>', 'max crawl depth', (v) => parseInt(v, 10), 2)
   .option('--max-pages <n>', 'max pages to visit when crawling', (v) => parseInt(v, 10), 50)
@@ -47,6 +48,7 @@ program
       const result = await run({
         projectRoot,
         outputDir: opts.output,
+        recordingFile: opts.recording,
         target: {
           url,
           urlsFile: opts.urls,
