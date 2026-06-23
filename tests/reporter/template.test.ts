@@ -80,8 +80,21 @@ describe.skipIf(!hasBrowsers)('renderReport — axe-core self-audit', () => {
     await browser?.close();
   });
 
+  it('keeps tabs and theme toggle working even when localStorage is blocked', async () => {
+    await page.setContent(html);
+    // setContent yields an opaque origin where localStorage throws — the script
+    // must survive that so the whole interactive layer doesn't die.
+    await page.click('#tab-by-issue');
+    expect(await page.evaluate(() => document.querySelector('.view.active')?.id)).toBe('by-issue');
+    await page.click('#themeToggle');
+    expect(await page.evaluate(() => document.documentElement.getAttribute('data-theme'))).toBe('light');
+  });
+
   it.each(['dark', 'light'])('the generated report has no WCAG A/AA violations (%s theme)', async (theme) => {
     await page.setContent(html);
+    // Disable transitions so we audit the settled theme colors, not a frame
+    // mid-way through the toggle's 150ms cross-fade.
+    await page.addStyleTag({ content: '*,*::before,*::after{transition:none !important;animation:none !important}' });
     await page.evaluate((t) => document.documentElement.setAttribute('data-theme', t), theme);
     const results = await new AxeBuilder({ page })
       .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa'])

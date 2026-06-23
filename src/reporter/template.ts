@@ -9,48 +9,76 @@ const IMPACT_LABEL: Record<Impact, string> = {
 };
 
 export function renderReport(data: ReportData): string {
+  const generated = escapeHtml(new Date(data.generatedAt).toLocaleString());
+  const t = data.totals;
+  const total = t.violationNodes;
   return `<!doctype html>
 <html lang="en" data-theme="dark">
 <head>
 <meta charset="utf-8" />
-<title>auto-a11y report — ${escapeHtml(new Date(data.generatedAt).toLocaleString())}</title>
+<title>auto-a11y report — ${generated}</title>
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <style>${STYLES}</style>
 </head>
 <body>
 <header class="topbar">
-  <h1 class="brand">auto-a11y</h1>
-  <p class="meta">Generated ${escapeHtml(new Date(data.generatedAt).toLocaleString())} · ${data.totals.pages} page(s) · ${data.totals.violationNodes} failing instance(s)</p>
-  <button type="button" class="theme-toggle" id="themeToggle">Switch to light theme</button>
+  <div class="wrap topbar-inner">
+    <div class="brand-group">
+      ${LOGO_SVG}
+      <div class="brand-text">
+        <h1 class="brand">auto-a11y</h1>
+        <p class="tagline">Accessibility audit report</p>
+      </div>
+    </div>
+    <div class="topbar-meta">
+      <p class="meta">${generated} · ${t.pages} page${t.pages === 1 ? '' : 's'} · ${total} failing instance${total === 1 ? '' : 's'}</p>
+      <button type="button" class="theme-toggle" id="themeToggle">Switch to light theme</button>
+    </div>
+  </div>
 </header>
 
-<section class="summary" aria-label="Failing instances by impact">
-  ${renderImpactPill('critical', data.totals.impacts.critical)}
-  ${renderImpactPill('serious', data.totals.impacts.serious)}
-  ${renderImpactPill('moderate', data.totals.impacts.moderate)}
-  ${renderImpactPill('minor', data.totals.impacts.minor)}
+<section class="overview wrap" aria-label="Summary">
+  <div class="score-card">
+    <div class="donut" style="background:${donutGradient(t.impacts, total)}">
+      <div class="donut-center">
+        <span class="donut-num">${total}</span>
+        <span class="donut-cap">issue${total === 1 ? '' : 's'}</span>
+      </div>
+    </div>
+    <div class="score-meta">
+      <p class="score-title">${total === 0 ? 'No violations found' : 'Failing instances'}</p>
+      <p class="score-sub">Across ${t.pages} page${t.pages === 1 ? '' : 's'} · ${t.findings} check run${t.findings === 1 ? '' : 's'}</p>
+    </div>
+  </div>
+  ${renderStatCard('critical', t.impacts.critical)}
+  ${renderStatCard('serious', t.impacts.serious)}
+  ${renderStatCard('moderate', t.impacts.moderate)}
+  ${renderStatCard('minor', t.impacts.minor)}
 </section>
 
-<div class="tabs" role="tablist" aria-label="Report views">
-  <button type="button" class="tab active" role="tab" id="tab-by-page" aria-selected="true" aria-controls="by-page" data-view="by-page">By page</button>
-  <button type="button" class="tab" role="tab" id="tab-by-issue" aria-selected="false" aria-controls="by-issue" data-view="by-issue" tabindex="-1">By issue type</button>
+<div class="toolbar">
+  <div class="wrap toolbar-inner">
+    <div class="tabs" role="tablist" aria-label="Report views">
+      <button type="button" class="tab active" role="tab" id="tab-by-page" aria-selected="true" aria-controls="by-page" data-view="by-page">By page</button>
+      <button type="button" class="tab" role="tab" id="tab-by-issue" aria-selected="false" aria-controls="by-issue" data-view="by-issue" tabindex="-1">By issue type</button>
+    </div>
+    <section class="filters" aria-label="Filters">
+      <label class="field"><span>Impact</span>
+        <select id="impactFilter">
+          <option value="">All</option>
+          <option value="critical">Critical</option>
+          <option value="serious">Serious</option>
+          <option value="moderate">Moderate</option>
+          <option value="minor">Minor</option>
+        </select>
+      </label>
+      <label class="toggle"><input type="checkbox" id="hideClean"> <span>Hide clean pages</span></label>
+      <label class="toggle"><input type="checkbox" id="expandAll" checked> <span>Expand all</span></label>
+    </section>
+  </div>
 </div>
 
-<section class="filters" aria-label="Filters">
-  <label><span>Impact:</span>
-    <select id="impactFilter">
-      <option value="">All</option>
-      <option value="critical">Critical</option>
-      <option value="serious">Serious</option>
-      <option value="moderate">Moderate</option>
-      <option value="minor">Minor</option>
-    </select>
-  </label>
-  <label class="toggle"><input type="checkbox" id="hideClean"> hide clean pages</label>
-  <label class="toggle"><input type="checkbox" id="expandAll" checked> expand all</label>
-</section>
-
-<main>
+<main class="wrap">
   <section id="by-page" class="view active" role="tabpanel" aria-labelledby="tab-by-page" tabindex="0">
     ${data.byPage.map(renderPage).join('\n')}
   </section>
@@ -59,24 +87,35 @@ export function renderReport(data: ReportData): string {
   </section>
 </main>
 
+<footer class="site-footer">
+  <div class="wrap">
+    Generated by <strong>auto-a11y</strong> · powered by axe-core &amp; Playwright. Automated testing catches a subset of accessibility issues — manual review with assistive technology remains essential.
+  </div>
+</footer>
+
 <script>${SCRIPT}</script>
 </body>
 </html>`;
 }
 
-function renderImpactPill(impact: Impact, n: number): string {
-  return `<div class="pill impact-${impact}"><span class="pill-label">${IMPACT_LABEL[impact]}</span><span class="pill-count">${n}</span></div>`;
+function renderStatCard(impact: Impact, n: number): string {
+  return `<div class="stat-card impact-${impact}">
+    <span class="stat-dot" aria-hidden="true"></span>
+    <span class="stat-count">${n}</span>
+    <span class="stat-label">${IMPACT_LABEL[impact]}</span>
+  </div>`;
 }
 
 function renderPage(group: PageGroup): string {
   const hasFindings = group.totalNodes > 0;
   const id = `page-${hash(group.url)}`;
+  const sev = hasFindings ? worstImpact(group.impacts) : 'clean';
   const summary = hasFindings
-    ? `${group.totalNodes} failing instance(s) across ${group.findings.length} check run(s)`
+    ? `${group.totalNodes} failing instance${group.totalNodes === 1 ? '' : 's'} across ${group.findings.length} check run${group.findings.length === 1 ? '' : 's'}`
     : 'No violations';
   // Default: open pages that have findings.
   const openAttr = hasFindings ? ' open' : '';
-  return `<details class="page-group${hasFindings ? '' : ' clean'}" data-impacts="${impactsAttr(group.impacts)}" data-clean="${hasFindings ? 'false' : 'true'}"${openAttr}>
+  return `<details class="page-group sev-${sev}${hasFindings ? '' : ' clean'}" data-impacts="${impactsAttr(group.impacts)}" data-clean="${hasFindings ? 'false' : 'true'}"${openAttr}>
   <summary>
     <h2 class="page-title">${escapeHtml(group.pageTitle || group.url)}</h2>
     <div class="page-meta"><code>${escapeHtml(group.url)}</code></div>
@@ -113,7 +152,7 @@ function renderViolation(v: Violation, source: string): string {
     <span class="impact-badge impact-${v.impact}">${IMPACT_LABEL[v.impact]}</span>
     <span class="rule-id">${escapeHtml(v.id)}</span>
     <span class="source-badge">${escapeHtml(source)}</span>
-    <span class="count">${v.nodes.length} failing instance(s)</span>
+    <span class="count">${v.nodes.length} failing instance${v.nodes.length === 1 ? '' : 's'}</span>
     ${v.wcag?.map((w) => `<span class="wcag-tag">WCAG ${escapeHtml(w)}</span>`).join('') ?? ''}
   </header>
   <p class="violation-help">${escapeHtml(v.help)}${v.helpUrl ? ` <a href="${escapeHtml(v.helpUrl)}" target="_blank" rel="noopener">learn more →</a>` : ''}</p>
@@ -137,19 +176,49 @@ function renderNode(n: { target: string; html: string; failureSummary?: string; 
 }
 
 function renderIssue(issue: IssueGroup): string {
-  return `<details class="issue-group" data-impact="${issue.impact}" data-wcag="${issue.wcag.join(',')}" open>
+  return `<details class="issue-group sev-${issue.impact}" data-impact="${issue.impact}" data-wcag="${issue.wcag.join(',')}" open>
   <summary>
     <span class="impact-badge impact-${issue.impact}">${IMPACT_LABEL[issue.impact]}</span>
     <h2>${escapeHtml(issue.ruleId)}</h2>
-    <span class="count">${issue.totalNodes} failing instance(s) on ${issue.occurrences.length} page(s)</span>
+    <span class="count">${issue.totalNodes} failing instance${issue.totalNodes === 1 ? '' : 's'} on ${issue.occurrences.length} page${issue.occurrences.length === 1 ? '' : 's'}</span>
     ${issue.wcag.map((w) => `<span class="wcag-tag">WCAG ${escapeHtml(w)}</span>`).join('')}
   </summary>
   <p class="issue-help">${escapeHtml(issue.help)}${issue.helpUrl ? ` <a href="${escapeHtml(issue.helpUrl)}" target="_blank" rel="noopener">learn more →</a>` : ''}</p>
   ${issue.occurrences.map((occ) => `<div class="occurrence">
-    <h3><a href="${escapeHtml(occ.url)}" target="_blank" rel="noopener">${escapeHtml(occ.pageTitle || occ.url)}</a> <span class="count">${occ.nodes.length} instance(s)</span></h3>
+    <h3><a href="${escapeHtml(occ.url)}" target="_blank" rel="noopener">${escapeHtml(occ.pageTitle || occ.url)}</a> <span class="count">${occ.nodes.length} instance${occ.nodes.length === 1 ? '' : 's'}</span></h3>
     <ol class="nodes">${occ.nodes.map((n, i) => renderNode(n, i + 1)).join('')}</ol>
   </div>`).join('')}
 </details>`;
+}
+
+/** Conic-gradient string for the summary donut, segmented by impact share. */
+function donutGradient(impacts: Record<Impact, number>, total: number): string {
+  if (total <= 0) return 'var(--ok)';
+  const order: Array<[Impact, string]> = [
+    ['critical', 'var(--sev-critical)'],
+    ['serious', 'var(--sev-serious)'],
+    ['moderate', 'var(--sev-moderate)'],
+    ['minor', 'var(--sev-minor)'],
+  ];
+  const stops: string[] = [];
+  let acc = 0;
+  for (const [k, color] of order) {
+    const n = impacts[k];
+    if (n <= 0) continue;
+    const start = (acc / total) * 360;
+    acc += n;
+    const end = (acc / total) * 360;
+    stops.push(`${color} ${start.toFixed(2)}deg ${end.toFixed(2)}deg`);
+  }
+  return `conic-gradient(${stops.join(', ')})`;
+}
+
+/** Highest-severity impact present, for the card accent stripe. */
+function worstImpact(impacts: Record<Impact, number>): Impact {
+  if (impacts.critical > 0) return 'critical';
+  if (impacts.serious > 0) return 'serious';
+  if (impacts.moderate > 0) return 'moderate';
+  return 'minor';
 }
 
 function impactsAttr(impacts: Record<Impact, number>): string {
@@ -176,144 +245,228 @@ function hash(s: string): string {
   return Math.abs(h).toString(36);
 }
 
+const LOGO_SVG = `<svg class="logo" width="30" height="30" viewBox="0 0 30 30" aria-hidden="true" focusable="false">
+  <rect width="30" height="30" rx="8.5" fill="url(#a11y-logo)" />
+  <path d="M9 15.4l3.8 3.8L21 11" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" />
+  <defs><linearGradient id="a11y-logo" x1="0" y1="0" x2="30" y2="30" gradientUnits="userSpaceOnUse">
+    <stop stop-color="#7c8cff" /><stop offset="1" stop-color="#a855f7" />
+  </linearGradient></defs>
+</svg>`;
+
 const STYLES = `
-:root {
-  color-scheme: dark light;
-}
+:root { color-scheme: dark light; }
 html[data-theme="dark"] {
-  --bg: #0d1117;
-  --bg-elev: #161b22;
-  --bg-elev2: #1c2230;
-  --fg: #e6edf3;
-  --muted: #8b949e;
-  --border: #30363d;
-  --accent: #58a6ff;
-  --crit: #f85149;
-  --serious: #f0883e;
-  --moderate: #d29922;
-  --minor: #8b949e;
-  --ok: #3fb950;
-  --tag-bg: rgba(56, 139, 253, 0.18);
-  --tag-fg: #79c0ff;
-  --code-bg: #010409;
-  --code-fg: #c9d1d9;
-  --shadow: 0 1px 2px rgba(0,0,0,0.4);
+  --bg: #0a0c10;
+  --band: #0e1117;
+  --surface: #11151c;
+  --surface-2: #171c26;
+  --fg: #e7ecf3;
+  --fg-strong: #f6f8fc;
+  --muted: #98a2b3;
+  --border: #222a36;
+  --border-strong: #2d3744;
+  --primary: #7c8cff;
+  --primary-strong: #9aa6ff;
+  --ok: #34d399;
+  --sev-critical: #ff5d5d;
+  --sev-serious: #ffa23e;
+  --sev-moderate: #ffd24a;
+  --sev-minor: #9aa4b2;
+  --code-bg: #05070b;
+  --code-fg: #cdd6e4;
+  --shadow: 0 1px 2px rgba(0,0,0,0.35), 0 1px 1px rgba(0,0,0,0.2);
+  --shadow-lg: 0 10px 30px -12px rgba(0,0,0,0.7);
+  --knob: #f6f8fc;
 }
 html[data-theme="light"] {
-  --bg: #f6f7f9;
-  --bg-elev: #ffffff;
-  --bg-elev2: #f1f3f7;
-  --fg: #1a1f2c;
-  --muted: #5b6478;
-  --border: #d8dde6;
-  --accent: #2563eb;
-  --crit: #b91c1c;
-  --serious: #c2410c;
-  --moderate: #b45309;
-  --minor: #475569;
-  --ok: #166534;
-  --tag-bg: #e0e7ff;
-  --tag-fg: #3730a3;
-  --code-bg: #0f172a;
-  --code-fg: #e2e8f0;
-  --shadow: 0 1px 2px rgba(0,0,0,0.06);
+  --bg: #f4f6f9;
+  --band: #ffffff;
+  --surface: #ffffff;
+  --surface-2: #f3f5f9;
+  --fg: #1c2331;
+  --fg-strong: #0c1119;
+  --muted: #5b6675;
+  --border: #e4e8ef;
+  --border-strong: #d2d8e2;
+  --primary: #4f46e5;
+  --primary-strong: #4338ca;
+  --ok: #15803d;
+  --sev-critical: #e5484d;
+  --sev-serious: #dd7411;
+  --sev-moderate: #b9810b;
+  --sev-minor: #64748b;
+  --code-bg: #0d1320;
+  --code-fg: #dde5f0;
+  --shadow: 0 1px 2px rgba(15,23,42,0.06), 0 1px 3px rgba(15,23,42,0.08);
+  --shadow-lg: 0 14px 32px -14px rgba(15,23,42,0.22);
+  --knob: #ffffff;
 }
 * { box-sizing: border-box; }
-body { font: 14px/1.5 -apple-system, "SF Pro Text", "Segoe UI", Roboto, sans-serif; margin: 0; background: var(--bg); color: var(--fg); }
-:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 2px; }
-summary:focus-visible, .tab:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+body { margin: 0; background: var(--bg); color: var(--fg);
+  font: 14px/1.55 "Inter", -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, sans-serif;
+  -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility; }
+a { color: var(--primary); }
+a:hover { color: var(--primary-strong); }
+:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; border-radius: 3px; }
+summary:focus-visible, .tab:focus-visible { outline: 2px solid var(--primary); outline-offset: -2px; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { transition: none !important; scroll-behavior: auto !important; }
 }
-.topbar { display: flex; align-items: center; gap: 16px; padding: 14px 24px; background: var(--bg-elev); border-bottom: 1px solid var(--border); }
-.brand { margin: 0; font-size: 15px; font-weight: 700; letter-spacing: 0.5px; color: var(--accent); }
-.meta { margin: 0; color: var(--muted); font-size: 13px; flex: 1; }
-.theme-toggle { background: var(--bg-elev2); color: var(--fg); border: 1px solid var(--border); border-radius: 6px; padding: 6px 12px; cursor: pointer; font: inherit; font-size: 12px; }
-.theme-toggle:hover { border-color: var(--accent); }
-.summary { display: flex; gap: 12px; padding: 16px 24px; background: var(--bg-elev); border-bottom: 1px solid var(--border); flex-wrap: wrap; }
-.pill { display: flex; flex-direction: column; align-items: center; padding: 10px 18px; border-radius: 8px; min-width: 110px; background: var(--bg-elev2); border: 1px solid var(--border); }
-.pill-label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.6px; }
-.pill-count { font-size: 24px; font-weight: 700; margin-top: 2px; }
-.pill.impact-critical .pill-count { color: var(--crit); }
-.pill.impact-serious .pill-count { color: var(--serious); }
-.pill.impact-moderate .pill-count { color: var(--moderate); }
-.pill.impact-minor .pill-count { color: var(--minor); }
-.tabs { display: flex; padding: 0 24px; background: var(--bg-elev); border-bottom: 1px solid var(--border); }
-.tab { background: none; border: 0; padding: 12px 18px; font: inherit; color: var(--muted); cursor: pointer; border-bottom: 2px solid transparent; }
+.wrap { width: 100%; max-width: 1180px; margin: 0 auto; padding: 0 28px; }
+
+/* Header */
+.topbar { background: var(--band); border-bottom: 1px solid var(--border); }
+.topbar-inner { display: flex; align-items: center; justify-content: space-between; gap: 18px; padding: 16px 28px; flex-wrap: wrap; }
+.brand-group { display: flex; align-items: center; gap: 12px; }
+.logo { display: block; border-radius: 8.5px; box-shadow: 0 2px 8px -2px rgba(124,140,255,0.5); }
+.brand-text { display: flex; flex-direction: column; }
+.brand { margin: 0; font-size: 16px; font-weight: 700; letter-spacing: -0.2px; color: var(--fg-strong); }
+.tagline { margin: 0; font-size: 12px; color: var(--muted); }
+.topbar-meta { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+.meta { margin: 0; color: var(--muted); font-size: 12.5px; }
+.theme-toggle { background: var(--surface-2); color: var(--fg); border: 1px solid var(--border); border-radius: 8px; padding: 7px 13px; cursor: pointer; font: inherit; font-size: 12px; font-weight: 500; transition: border-color 0.15s, background 0.15s; }
+.theme-toggle:hover { border-color: var(--border-strong); background: var(--surface); }
+
+/* Overview */
+.overview { display: flex; gap: 14px; flex-wrap: wrap; align-items: stretch; padding-top: 24px; padding-bottom: 4px; }
+.score-card { flex: 2 1 300px; display: flex; align-items: center; gap: 20px; background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 20px 22px; box-shadow: var(--shadow); }
+.donut { width: 88px; height: 88px; border-radius: 50%; position: relative; flex: none; }
+.donut-center { position: absolute; inset: 11px; border-radius: 50%; background: var(--surface); display: flex; flex-direction: column; align-items: center; justify-content: center; }
+.donut-num { font-size: 24px; font-weight: 750; color: var(--fg-strong); font-variant-numeric: tabular-nums; line-height: 1; }
+.donut-cap { font-size: 10.5px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.6px; margin-top: 2px; }
+.score-meta { display: flex; flex-direction: column; gap: 3px; }
+.score-title { margin: 0; font-size: 16px; font-weight: 650; color: var(--fg-strong); letter-spacing: -0.2px; }
+.score-sub { margin: 0; font-size: 12.5px; color: var(--muted); }
+.stat-card { flex: 1 1 124px; display: flex; flex-direction: column; gap: 6px; background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 16px 18px; box-shadow: var(--shadow); transition: border-color 0.15s, transform 0.15s; }
+.stat-card:hover { border-color: var(--border-strong); transform: translateY(-1px); }
+.stat-dot { width: 9px; height: 9px; border-radius: 50%; }
+.stat-card.impact-critical .stat-dot { background: var(--sev-critical); }
+.stat-card.impact-serious .stat-dot { background: var(--sev-serious); }
+.stat-card.impact-moderate .stat-dot { background: var(--sev-moderate); }
+.stat-card.impact-minor .stat-dot { background: var(--sev-minor); }
+.stat-count { font-size: 27px; font-weight: 750; color: var(--fg-strong); font-variant-numeric: tabular-nums; line-height: 1.05; letter-spacing: -0.5px; }
+.stat-label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.7px; font-weight: 600; }
+
+/* Sticky toolbar */
+.toolbar { position: sticky; top: 0; z-index: 30; background: var(--band); border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); margin-top: 22px; }
+.toolbar-inner { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 12px 28px; flex-wrap: wrap; }
+.tabs { display: inline-flex; gap: 4px; background: var(--surface-2); border: 1px solid var(--border); border-radius: 11px; padding: 4px; }
+.tab { background: transparent; border: 0; padding: 7px 15px; font: inherit; font-size: 13px; font-weight: 600; color: var(--muted); cursor: pointer; border-radius: 8px; transition: color 0.15s, background 0.15s, box-shadow 0.15s; }
 .tab:hover { color: var(--fg); }
-.tab.active { color: var(--accent); border-color: var(--accent); font-weight: 600; }
-.filters { display: flex; gap: 20px; padding: 12px 24px; background: var(--bg-elev); border-bottom: 1px solid var(--border); flex-wrap: wrap; align-items: center; }
-.filters label { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 13px; }
-.filters select { padding: 5px 10px; border-radius: 6px; border: 1px solid var(--border); background: var(--bg-elev2); color: var(--fg); font: inherit; font-size: 13px; }
-.filters .toggle input { accent-color: var(--accent); }
-main { padding: 24px; max-width: 1280px; margin: 0 auto; }
+.tab.active { color: var(--fg-strong); background: var(--surface); box-shadow: var(--shadow); }
+.filters { display: flex; gap: 16px; align-items: center; flex-wrap: wrap; }
+.filters .field { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 12.5px; font-weight: 500; }
+.filters select { appearance: none; -webkit-appearance: none; padding: 7px 30px 7px 12px; border-radius: 9px; border: 1px solid var(--border); background-color: var(--surface-2); color: var(--fg); font: inherit; font-size: 13px; cursor: pointer; transition: border-color 0.15s;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath d='M2.5 4.5l3.5 3.5 3.5-3.5' fill='none' stroke='%238b95a7' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat; background-position: right 11px center; }
+.filters select:hover { border-color: var(--border-strong); }
+.toggle { display: inline-flex; align-items: center; gap: 9px; color: var(--muted); font-size: 12.5px; font-weight: 500; cursor: pointer; }
+.toggle input { appearance: none; -webkit-appearance: none; position: relative; width: 36px; height: 20px; border-radius: 999px; background: var(--border-strong); cursor: pointer; flex: none; transition: background 0.15s; margin: 0; }
+.toggle input::after { content: ""; position: absolute; top: 2px; left: 2px; width: 16px; height: 16px; border-radius: 50%; background: var(--knob); box-shadow: 0 1px 2px rgba(0,0,0,0.35); transition: transform 0.15s; }
+.toggle input:checked { background: var(--primary); }
+.toggle input:checked::after { transform: translateX(16px); }
+
+/* Main + cards */
+main { padding-top: 24px; padding-bottom: 56px; }
 .view { display: none; }
 .view.active { display: block; }
-.page-group, .issue-group { background: var(--bg-elev); border: 1px solid var(--border); border-radius: 12px; margin-bottom: 16px; overflow: hidden; box-shadow: var(--shadow); }
+.page-group, .issue-group { position: relative; background: var(--surface); border: 1px solid var(--border); border-radius: 14px; margin-bottom: 14px; overflow: hidden; box-shadow: var(--shadow); transition: border-color 0.15s, box-shadow 0.15s; }
+.page-group:hover, .issue-group:hover { border-color: var(--border-strong); box-shadow: var(--shadow-lg); }
+.page-group::after, .issue-group::after { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: var(--accent-stripe, var(--border-strong)); }
+.sev-critical { --accent-stripe: var(--sev-critical); }
+.sev-serious { --accent-stripe: var(--sev-serious); }
+.sev-moderate { --accent-stripe: var(--sev-moderate); }
+.sev-minor { --accent-stripe: var(--sev-minor); }
+.sev-clean, .page-group.clean { --accent-stripe: var(--ok); }
 .page-group summary, .issue-group summary { padding: 16px 20px; cursor: pointer; list-style: none; display: flex; flex-wrap: wrap; align-items: center; gap: 12px; user-select: none; }
 .page-group summary::marker, .issue-group summary::marker { display: none; }
-.page-group summary::before, .issue-group summary::before { content: "▶"; color: var(--muted); font-size: 10px; transition: transform 0.15s; display: inline-block; }
+.page-group summary::before, .issue-group summary::before { content: "›"; color: var(--muted); font-size: 18px; line-height: 1; font-weight: 700; transition: transform 0.15s; display: inline-block; width: 12px; }
 .page-group[open] summary::before, .issue-group[open] summary::before { transform: rotate(90deg); }
-.page-group summary h2, .issue-group summary h2 { font-size: 16px; margin: 0; color: var(--fg); }
-.page-link { margin: 0 0 12px; }
-.page-link a { color: var(--accent); font-size: 13px; }
-.page-group .page-meta { width: 100%; color: var(--muted); font-size: 12px; padding-left: 16px; }
-.page-group .page-meta code { background: transparent; padding: 0; }
-.page-group .page-summary { font-size: 12px; color: var(--muted); margin-left: auto; }
-.page-group.clean .page-summary { color: var(--ok); }
-.page-body { padding: 8px 20px 16px; }
-.violation { border-top: 1px solid var(--border); padding: 18px 0; }
-.violation:first-child { border-top: 0; }
+.page-group summary h2, .issue-group summary h2 { font-size: 15.5px; margin: 0; color: var(--fg-strong); font-weight: 650; letter-spacing: -0.2px; }
+.page-title { word-break: break-word; }
+.page-link { margin: 0 0 14px; }
+.page-link a { font-size: 13px; font-weight: 500; text-decoration: none; }
+.page-link a:hover { text-decoration: underline; }
+.page-group .page-meta { width: 100%; color: var(--muted); font-size: 12px; padding-left: 28px; }
+.page-group .page-meta code { background: transparent; padding: 0; font-family: ui-monospace, SFMono-Regular, monospace; word-break: break-all; }
+.page-group .page-summary { font-size: 12px; color: var(--muted); margin-left: auto; white-space: nowrap; }
+.page-group.clean .page-summary { color: var(--ok); font-weight: 600; }
+.page-body { padding: 6px 20px 18px; }
+
+/* Violation cards */
+.violation { position: relative; background: var(--surface-2); border: 1px solid var(--border); border-radius: 12px; padding: 16px 18px; margin-top: 12px; }
+.violation::before { content: ""; position: absolute; left: 0; top: 12px; bottom: 12px; width: 3px; border-radius: 3px; background: var(--sev, var(--border-strong)); }
+.violation.impact-critical { --sev: var(--sev-critical); }
+.violation.impact-serious { --sev: var(--sev-serious); }
+.violation.impact-moderate { --sev: var(--sev-moderate); }
+.violation.impact-minor { --sev: var(--sev-minor); }
 .violation-head { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
 /* Badge backgrounds are fixed (theme-independent) and dark enough for white
    text to clear WCAG 1.4.3 AA (>=4.5:1) in both themes. */
-.impact-badge { padding: 3px 10px; border-radius: 4px; font-size: 11px; font-weight: 700; color: #fff; text-transform: uppercase; letter-spacing: 0.5px; }
+.impact-badge { padding: 3px 10px; border-radius: 5px; font-size: 10.5px; font-weight: 700; color: #fff; text-transform: uppercase; letter-spacing: 0.5px; }
 .impact-badge.impact-critical { background: #b3261d; }
 .impact-badge.impact-serious { background: #b2540e; }
 .impact-badge.impact-moderate { background: #8c5a00; }
 .impact-badge.impact-minor { background: #475569; }
-.ok-badge { padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 700; background: #1a7f37; color: #fff; text-transform: uppercase; letter-spacing: 0.5px; }
-.rule-id { font-family: ui-monospace, SFMono-Regular, monospace; font-size: 13px; font-weight: 600; color: var(--fg); }
-.source-badge { font-size: 11px; padding: 2px 8px; background: var(--bg-elev2); border: 1px solid var(--border); border-radius: 4px; color: var(--muted); }
-.count { font-size: 12px; color: var(--muted); font-weight: 500; margin-left: auto; }
-.wcag-tag { font-size: 11px; padding: 2px 8px; background: var(--tag-bg); color: var(--tag-fg); border-radius: 4px; }
-.violation-help { color: var(--muted); margin: 10px 0; font-size: 13px; }
-.violation-help a, .issue-help a { color: var(--accent); }
-.criteria { font-size: 12px; color: var(--muted); padding-left: 20px; margin: 6px 0; }
-.criteria a { color: var(--accent); text-decoration: none; }
+.ok-badge { padding: 3px 9px; border-radius: 5px; font-size: 10.5px; font-weight: 700; background: #1a7f37; color: #fff; text-transform: uppercase; letter-spacing: 0.5px; }
+.rule-id { font-family: ui-monospace, SFMono-Regular, monospace; font-size: 13px; font-weight: 600; color: var(--fg-strong); }
+.source-badge { font-size: 10.5px; padding: 3px 8px; background: var(--surface); border: 1px solid var(--border); border-radius: 5px; color: var(--muted); font-weight: 500; }
+.count { font-size: 12px; color: var(--muted); font-weight: 500; margin-left: auto; white-space: nowrap; }
+.wcag-tag { font-size: 10.5px; padding: 3px 8px; background: var(--surface); color: var(--muted); border: 1px solid var(--border); border-radius: 5px; font-weight: 500; }
+.violation-help { color: var(--fg); margin: 12px 0 0; font-size: 13px; }
+.violation-help a, .issue-help a { font-weight: 500; }
+.criteria { font-size: 12px; color: var(--muted); padding-left: 18px; margin: 8px 0 0; }
+.criteria li { margin: 2px 0; }
+.criteria a { text-decoration: none; }
 .criteria a:hover { text-decoration: underline; }
-.nodes { padding-left: 0; list-style: none; counter-reset: node; margin: 12px 0 0; }
-.nodes-flat { padding-left: 20px; color: var(--muted); font-size: 12px; margin: 6px 0; }
-.node { background: var(--bg-elev2); border: 1px solid var(--border); border-radius: 8px; padding: 12px; margin-bottom: 10px; }
+.nodes { padding-left: 0; list-style: none; margin: 14px 0 0; }
+.nodes-flat { padding-left: 18px; color: var(--muted); font-size: 12px; margin: 8px 0 0; }
+.node { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 12px 14px; margin-bottom: 10px; }
+.node:last-child { margin-bottom: 0; }
 .node-head { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
-.node-index { font-family: ui-monospace, SFMono-Regular, monospace; font-size: 11px; color: var(--muted); background: var(--bg); padding: 2px 8px; border-radius: 999px; border: 1px solid var(--border); }
-.selector { display: inline-block; font-family: ui-monospace, SFMono-Regular, monospace; padding: 3px 8px; background: var(--bg); border: 1px solid var(--border); border-radius: 4px; font-size: 12px; color: var(--fg); word-break: break-all; }
-.failure { color: var(--serious); font-size: 13px; margin: 6px 0; }
-.snippet { background: var(--code-bg); color: var(--code-fg); padding: 10px 12px; border-radius: 6px; overflow: auto; font-size: 12px; max-height: 220px; line-height: 1.45; margin: 6px 0 0; }
+.node-index { font-family: ui-monospace, SFMono-Regular, monospace; font-size: 11px; color: var(--muted); background: var(--surface-2); padding: 2px 8px; border-radius: 999px; border: 1px solid var(--border); }
+.selector { display: inline-block; font-family: ui-monospace, SFMono-Regular, monospace; padding: 3px 8px; background: var(--surface-2); border: 1px solid var(--border); border-radius: 6px; font-size: 12px; color: var(--fg); word-break: break-all; }
+.failure { color: var(--fg); font-size: 12.5px; margin: 8px 0; padding: 9px 12px; background: var(--surface-2); border-left: 3px solid var(--sev-serious); border-radius: 0 6px 6px 0; }
+.snippet { background: var(--code-bg); color: var(--code-fg); padding: 11px 13px; border-radius: 8px; overflow: auto; font-size: 12px; max-height: 230px; line-height: 1.5; margin: 8px 0 0; }
 .snippet code { font-family: ui-monospace, SFMono-Regular, monospace; }
-.shot { display: block; max-width: 360px; margin-top: 10px; border: 1px solid var(--border); border-radius: 6px; }
-.validation { padding: 12px 0; border-top: 1px dashed var(--border); }
-.validation-head { font-size: 13px; color: var(--ok); display: flex; align-items: center; gap: 8px; }
-.issue-group summary h2 { font-family: ui-monospace, SFMono-Regular, monospace; color: var(--fg); }
-.issue-help { padding: 0 20px 12px; color: var(--muted); font-size: 13px; }
-.occurrence { padding: 12px 20px; border-top: 1px solid var(--border); }
-.occurrence h3 { font-size: 14px; margin: 0 0 8px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
-.occurrence h3 a { color: var(--accent); text-decoration: none; }
+.shot { display: block; max-width: 360px; margin-top: 10px; border: 1px solid var(--border); border-radius: 8px; }
+.validation { padding: 14px 16px; margin-top: 12px; background: var(--surface-2); border: 1px solid var(--border); border-radius: 12px; }
+.validation-head { font-size: 13px; color: var(--fg); display: flex; align-items: center; gap: 9px; flex-wrap: wrap; }
+.issue-group summary h2 { font-family: ui-monospace, SFMono-Regular, monospace; font-size: 14px; color: var(--fg-strong); }
+.issue-help { padding: 0 20px 14px; color: var(--fg); font-size: 13px; }
+.occurrence { padding: 14px 20px; border-top: 1px solid var(--border); }
+.occurrence h3 { font-size: 13.5px; margin: 0 0 10px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; font-weight: 600; }
+.occurrence h3 a { text-decoration: none; }
 .occurrence h3 a:hover { text-decoration: underline; }
+
+/* Footer */
+.site-footer { border-top: 1px solid var(--border); background: var(--band); }
+.site-footer .wrap { padding-top: 22px; padding-bottom: 22px; color: var(--muted); font-size: 12.5px; }
+.site-footer strong { color: var(--fg); font-weight: 650; }
+
 .hidden { display: none !important; }
-@media (max-width: 720px) {
-  main { padding: 12px; }
-  .summary { gap: 8px; padding: 12px; }
-  .pill { min-width: 72px; padding: 8px 10px; }
-  .topbar { padding: 12px; }
-  .filters { padding: 10px 12px; gap: 12px; }
+@media (max-width: 760px) {
+  .wrap { padding: 0 16px; }
+  .topbar-inner, .toolbar-inner { padding: 12px 16px; }
+  .topbar-meta { width: 100%; justify-content: space-between; }
+  .overview { padding-top: 18px; }
+  .score-card { flex-basis: 100%; }
+  .stat-card { flex-basis: calc(50% - 7px); }
+  .toolbar-inner { gap: 12px; }
+  .filters { gap: 12px; }
+  .page-group .page-summary { margin-left: 0; width: 100%; padding-left: 28px; }
 }
 `;
 
 const SCRIPT = `
 (function() {
+  // localStorage access throws on opaque/sandboxed origins (and some file://
+  // setups); guard it so theme persistence never breaks the rest of the script.
+  const safeGet = (k) => { try { return localStorage.getItem(k); } catch (e) { return null; } };
+  const safeSet = (k, v) => { try { localStorage.setItem(k, v); } catch (e) {} };
+
   const html = document.documentElement;
-  const stored = localStorage.getItem('a11yTheme');
+  const stored = safeGet('a11yTheme');
   if (stored) html.setAttribute('data-theme', stored);
   const themeBtn = document.getElementById('themeToggle');
   const syncBtn = () => themeBtn.textContent = html.getAttribute('data-theme') === 'dark' ? 'Switch to light theme' : 'Switch to dark theme';
@@ -321,7 +474,7 @@ const SCRIPT = `
   themeBtn.addEventListener('click', () => {
     const next = html.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
     html.setAttribute('data-theme', next);
-    localStorage.setItem('a11yTheme', next);
+    safeSet('a11yTheme', next);
     syncBtn();
   });
 
