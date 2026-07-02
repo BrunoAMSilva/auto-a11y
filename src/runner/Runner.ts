@@ -11,6 +11,9 @@ import { resolveTargets, type TargetSpec } from './TargetResolver.js';
 import { waitForReady, type WaitOptions } from './waitForReady.js';
 import { parseRecording } from '../recording/parser.js';
 import { replayRecording } from '../recording/replay.js';
+import { AssessmentRunner } from '../assessment/AssessmentRunner.js';
+import { getViewportProfileSpec } from '../assessment/viewport-profiles.js';
+import type { ViewportProfile } from '../assessment/types.js';
 
 export interface RunOptions {
   projectRoot: string;
@@ -22,6 +25,10 @@ export interface RunOptions {
   axeTags?: string[];
   axeDisableRules?: string[];
   builtins?: boolean;
+  /** Run the ported engine assessment plugins (18 hand-written checks). Default true. */
+  assessment?: boolean;
+  /** Device profile to emulate for the whole run. Default 'desktop'. */
+  viewportProfile?: ViewportProfile;
   headless?: boolean;
   logger?: Logger;
   wait?: WaitOptions;
@@ -34,6 +41,8 @@ interface CheckShared {
   standards: StandardsService;
   outputDir: string;
   logger: Logger;
+  /** Present when the assessment-plugin layer is enabled; one instance per run. */
+  assessment?: AssessmentRunner;
 }
 
 export interface RunResult {
@@ -64,7 +73,21 @@ export async function run(opts: RunOptions): Promise<RunResult> {
   const checks = await buildRegistry(registryOpts);
   logger.info(`Registered ${checks.length} check(s): ${checks.map((c) => c.id).join(', ')}`);
 
-  const shared: CheckShared = { checks, wcagIndex, standards, outputDir, logger };
+  const profile: ViewportProfile = opts.viewportProfile ?? 'desktop';
+  const assessment =
+    opts.assessment === false
+      ? undefined
+      : new AssessmentRunner({
+          outputDir,
+          standards,
+          logger: logger.child('assessment'),
+          viewportProfile: profile,
+        });
+  if (assessment) {
+    logger.info(`Assessment plugins enabled (viewport: ${profile}).`);
+  }
+
+  const shared: CheckShared = { checks, wcagIndex, standards, outputDir, logger, assessment };
 
   let browser: Browser | null = null;
   let context: BrowserContext | null = null;
@@ -74,7 +97,12 @@ export async function run(opts: RunOptions): Promise<RunResult> {
 
   try {
     browser = await launchBrowser({ projectRoot: opts.projectRoot, headless: opts.headless ?? true });
-    context = await newContext(browser, { projectRoot: opts.projectRoot });
+    const spec = getViewportProfileSpec(profile);
+    context = await newContext(browser, {
+      projectRoot: opts.projectRoot,
+      viewport: { width: spec.width, height: spec.height },
+      userAgent: spec.userAgent,
+    });
 
     if (opts.recordingFile) {
       const recording = parseRecording(await readFile(opts.recordingFile, 'utf8'));
@@ -170,6 +198,19 @@ async function runChecksOnPage(
       findingsBuf.push(buildRunnerErrorFinding(check, url, pageTitle, ci, err));
     }
   }
+
+  // Run the ported engine assessment plugins after the registered checks. One
+  // Finding is appended when anything is flagged. Never throws — a plugin-layer
+  // failure is logged and the registered-check findings still stand.
+  if (shared.assessment) {
+    try {
+      const finding = await shared.assessment.assess(page, url, pageTitle, shared.checks.length + 1);
+      if (finding) findingsBuf.push(finding);
+    } catch (err) {
+      shared.logger.error(`Assessment plugins threw on ${url}`, err);
+    }
+  }
+
   return findingsBuf;
 }
 

@@ -24,7 +24,9 @@ auto-a11y scan --output ./report                        output dir (default: ./a
 auto-a11y scan --tags wcag2a,wcag2aa,wcag22aa           override axe tags
 auto-a11y scan --disable-rules color-contrast           disable specific axe rules
 auto-a11y scan --no-axe                                 disable axe (custom checks only)
-auto-a11y scan --no-builtins                            disable built-in checks entirely
+auto-a11y scan --no-builtins                            disable built-in axe + iframe-title checks
+auto-a11y scan --no-assessment                          disable the built-in assessment plugins
+auto-a11y scan --viewport mobile                        emulate a mobile device (enables target-size)
 auto-a11y scan --wait-for "main h1"                     wait for selector before scanning (SPAs)
 auto-a11y scan --wait-ms 1500                           extra fixed delay after readiness
 auto-a11y scan --no-wait-title                          don't require document.title before scanning
@@ -36,6 +38,25 @@ auto-a11y bundle --out ./offline.tgz                    offline tarball
 ```
 
 Exit codes: `0` clean · `1` violations found · `2` runtime error.
+
+## Built-in checks
+
+Every scan runs three layers (disable individually with the flags above):
+
+1. **axe-core** — the broad WCAG 2.0/2.1/2.2 rule set (`--tags` / `--disable-rules`).
+2. **iframe-title** — accessible names for iframes.
+3. **Assessment plugins** — 18 hand-written checks (ported from the open-path
+   engine) covering ground axe cannot automate: heading structure, landmarks,
+   generic/ambiguous link text, out-of-context links, page title, `lang`, skip
+   links, form labels/grouping/autocomplete, data tables, multimedia
+   captions/audio-description, motion, consistent navigation & help, target size,
+   text spacing, reflow, focus visibility and focus-not-obscured.
+
+   These use a browser-native accessible-name resolver (Chrome DevTools Protocol
+   accessibility tree) so name computation matches what assistive tech sees. Each
+   plugin is bounded by a per-plugin timeout, and element handles are disposed
+   between plugins. `target-size` only runs under `--viewport mobile`; `reflow`
+   and the focus checks run last because they mutate the viewport / move focus.
 
 ## Chrome DevTools recordings
 

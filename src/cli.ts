@@ -28,6 +28,8 @@ program
   .option('--checks-dir <path>', 'directory of additional custom checks (.js/.mjs)')
   .option('--no-builtins', 'disable built-in checks (axe + iframe-title)')
   .option('--no-axe', 'disable axe-core check only')
+  .option('--no-assessment', 'disable the ported engine assessment plugins (18 hand-written checks)')
+  .option('--viewport <profile>', 'device profile to emulate: desktop | mobile', 'desktop')
   .option('--tags <list>', 'comma-separated axe tags', (v) => v.split(',').map((s) => s.trim()))
   .option('--disable-rules <list>', 'comma-separated axe rule ids to disable', (v) => v.split(',').map((s) => s.trim()))
   .option('--output <dir>', 'output directory for report', './a11y-report')
@@ -63,6 +65,8 @@ program
         axeTags: opts.tags,
         axeDisableRules: opts.disableRules,
         builtins: opts.builtins !== false ? (opts.axe === false ? false : undefined) : false,
+        assessment: opts.assessment !== false,
+        viewportProfile: opts.viewport === 'mobile' ? 'mobile' : 'desktop',
         headless: !opts.headed,
         logger,
         wait: {
